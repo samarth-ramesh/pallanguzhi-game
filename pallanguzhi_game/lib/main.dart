@@ -1,6 +1,5 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
+import 'package:pallanguzhi_game/cll.dart';
 
 void main() {
   runApp(const MyApp());
@@ -53,33 +52,42 @@ class _HomeScreenState extends State<HomeScreen> {
   int valueB = 36;
   bool isGameRunning = false;
   bool curTurn = false;
+  GameList gl = GameList();
 
-  void onClickButton(int idx, int key) {
-    List<List<int>> normalizedScheme = [countA, countB];
-    int numIters = normalizedScheme[key][idx];
-    if (idx == 3 || ((key > 0) ^ curTurn) || (numIters == 0)) {
-      // bank, other player, empty set
-
-      return;
+  List<List<int>>? doGameTransition(int idx) {
+    const p = 7;
+    if (gl.length() == 0) {
+      // game has not started yet!
+      return null;
     } else {
-      normalizedScheme[key][idx] = 0;
-      int curKey = key;
-      int curIdx = idx + 1;
-      for (var i = 0; i < numIters; i++) {
-        if (curIdx > 6) {
-          curIdx = curIdx - 7;
-          curKey = curKey > 0 ? 0 : 1;
+      if (curTurn) {
+        int numIters = countB[idx];
+        gl.setLocation(p + idx);
+        for (int i = 0; i < numIters; i++) {
+          int item = gl.getNextItem();
+          gl.writeCurrentItem(item + 1);
         }
-        log("curKey: $curKey, curIdx: $curIdx");
-        normalizedScheme[curKey][curIdx]++;
-        curIdx++;
+      } else {
+        int numIters = countA[idx];
+        gl.setLocation(idx);
+        for (int i = 0; i < numIters; i++) {
+          int item = gl.getPreviousItem();
+          gl.writeCurrentItem(item + 1);
+        }
       }
+      return gl.convertToNormalForm(p);
     }
-    setState(() {
-      countA = normalizedScheme[0];
-      countB = normalizedScheme[1];
-      curTurn = !curTurn;
-    });
+  }
+
+  void onClickButton(int idx) {
+    var normalizedScheme = doGameTransition(idx);
+    if (normalizedScheme != null) {
+      setState(() {
+        countA = normalizedScheme[0];
+        countB = normalizedScheme[1];
+        curTurn = !curTurn;
+      });
+    }
   }
 
   void startGameForPlayer(int count, List<int> board) {
@@ -96,14 +104,23 @@ class _HomeScreenState extends State<HomeScreen> {
   void startGame() {
     startGameForPlayer(valueA, countA);
     startGameForPlayer(valueB, countB);
+    gl = GameList.init([countA, countB]);
   }
 
-  List<Widget> renderRow(List<int> l, int key) {
+  List<Widget> renderRow(List<int> l, bool modifier) {
     List<Widget> rv = [];
     for (var i = 0; i < l.length; i++) {
+      if (i == 3) {
+        rv.add(TextButton(
+          onPressed: () => {},
+          child: Text(l[i].toString()),
+        ));
+      }
       rv.add(TextButton(
-          onPressed: () => {onClickButton(i, key)},
-          child: Text(l[i].toString())));
+        onPressed: () =>
+            {modifier && curTurn && gl.length() > 0 ? onClickButton(i) : null},
+        child: Text(l[i].toString()),
+      ));
     }
     return rv;
   }
@@ -116,10 +133,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         children: [
           Row(
-            children: renderRow(countA, 0),
+            children: renderRow(countA, false),
           ),
           Row(
-            children: renderRow(countB, 1),
+            children: renderRow(countB, true),
           ),
           FilledButton(onPressed: startGame, child: const Text("Start Gamet")),
           Text("Current Turn is : ${curTurn ? "Down" : "Up"}",
